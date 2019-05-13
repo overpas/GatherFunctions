@@ -71,3 +71,52 @@ exports.sendNotificationToPending = functions.firestore.document("Meetings/{meet
 	return "sendNotificationToPending finished";
 });
 
+exports.updateMessages = functions.firestore.document("Users/{user_id}").onUpdate((change, context) => {
+	const user_id = context.params.user_id;
+	const user_name = change.after.data().username;
+	const user_photo_url = change.after.data().photoUrl;
+	admin.firestore()
+		.collection("Meetings")
+		.get()
+		.then(snapshot => {
+    			if (snapshot.empty) {
+      				console.log('No matching meetings.');
+      				return;
+    			}
+    			return snapshot.forEach(doc => {
+      				console.log(doc.id, '=>', doc.data());
+				doc.ref.collection("Messages")
+					.where('authorId', '==', user_id)
+					.get()
+					.then(messagesSnapshot => {
+						if (messagesSnapshot.empty) {
+      							console.log('No matching messages.');
+      							return;
+    						}
+						return messagesSnapshot.forEach(messageDoc => {
+							console.log(messageDoc.id, '=>', messageDoc.data());
+							messageDoc.ref
+								.update({
+									authorName: user_name,
+									authorPhotoUrl: user_photo_url
+								})
+								.then(messageRef => {
+									console.log("Successfully updated " + messageRef.id);
+									return;
+								})
+								.catch(updError => {
+									console.log('Error updating message', updError);
+								});
+						});
+					})
+					.catch(messagesError => {
+						console.log('Error getting messages', messagesError);
+					});
+    			});
+  		})
+  		.catch(err => {
+    			console.log('Error getting meetings', err);
+  		});
+	return "updateMessages fired";
+});
+
